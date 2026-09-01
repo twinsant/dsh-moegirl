@@ -43,7 +43,7 @@ dsh plugin --profile web add file:"$PWD"
 dsh --profile web
 ```
 
-打开 Web UI（默认 http://127.0.0.1:3080）即可看到右下角的精灵。修改代码后重新 `pnpm run build`，再执行 `dsh plugin --profile web update dsh-moegirl`（或重新 add）并刷新页面。
+打开 Web UI（默认 http://127.0.0.1:3080 ）即可看到右下角的精灵。修改代码后重新 `pnpm run build`，再执行 `dsh plugin --profile web update dsh-moegirl`（或重新 add）并刷新页面。
 
 ## 卸载
 
