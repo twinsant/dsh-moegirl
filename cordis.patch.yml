@@ -1,0 +1,6 @@
+# dsh-moegirl bundle patch: one Loader row is simultaneously the host entry
+# (empty node half) and the browser roster entry — the modules node half
+# scans the package's dsh.client declaration and serves /plugins/dsh-moegirl/client.js.
+- insert:
+    - id: client-ui-moegirl
+      name: 'dsh-moegirl'

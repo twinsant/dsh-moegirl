@@ -1,0 +1,131 @@
+/* Moegirl sprite: bottom-right floating chibi (bitmap sprite sheet), mood driven by [data-mood]. */
+
+.root {
+  position: fixed;
+  right: 20px;
+  bottom: 16px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  /* The shell.overlay layer is click-through; the sprite opts back in. */
+  pointer-events: auto;
+  user-select: none;
+}
+
+.sprite {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  position: relative; /* anchor for the floating reaction emote */
+  filter: drop-shadow(0 4px 10px rgb(0 0 0 / 18%));
+  transition: transform 120ms ease;
+}
+
+.sprite:hover {
+  transform: translateY(-2px);
+}
+
+.figure {
+  background-repeat: no-repeat;
+  animation: breathe 3.2s ease-in-out infinite;
+}
+
+.bubble {
+  max-width: 180px;
+  padding: 8px 12px;
+  border-radius: 12px 12px 4px;
+  background: #fff;
+  color: #4a3238;
+  font-size: 12px;
+  line-height: 1.5;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 14%);
+  border: 1px solid rgb(236 108 168 / 35%);
+}
+
+.count {
+  margin-left: 4px;
+  color: #a8848f;
+  font-size: 11px;
+}
+
+/* ── per-mood motion (the frame itself carries the state props) ──────── */
+
+@keyframes breathe {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2px); }
+}
+
+/* idle: gentle breathe + a blink — a quick dip to the closed-eyes frame (1).
+   Discrete frame switch (steps(1,end)), NOT a vertical pan: the open/closed
+   transitions are hard cuts so the sheet never scrolls and "pushes" the
+   closed frame up into view. Shifts background-position-y longhand; inline
+   background-position-x (0) is preserved, and transform isn't touched. */
+.root[data-mood='idle'] .figure {
+  animation: breathe 3.2s ease-in-out infinite, blink 4.8s steps(1, end) infinite;
+}
+
+@keyframes blink {
+  0%, 92%, 100% { background-position-y: 0px; }
+  94%, 98% { background-position-y: calc(-1 * var(--frame-h)); }
+}
+
+/* working: quick bounce */
+.root[data-mood='working'] .figure {
+  animation: hop 0.6s ease-in-out infinite;
+}
+
+@keyframes hop {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+/* done: happy jump */
+.root[data-mood='done'] .figure {
+  animation: rejoice 1.1s ease-in-out infinite;
+}
+
+@keyframes rejoice {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  30% { transform: translateY(-7px) rotate(-3deg); }
+  60% { transform: translateY(0) rotate(0deg); }
+  80% { transform: translateY(-3px) rotate(2deg); }
+}
+
+/* ── click reaction: quick squash-stretch pop + floating heart ────────── */
+
+/* .root .figure.reacting (0,3,0) ties .root[data-mood] .figure (0,3,0),
+   so it must come after the mood rules; it overrides the mood animation
+   for the duration of the pop, then onAnimationEnd drops the class and the
+   mood animation (breathe/blink/hop/rejoice) resumes. */
+.root .figure.reacting {
+  animation: reaction-pop 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes reaction-pop {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.06, 0.94); }
+  55% { transform: scale(0.95, 1.05) translateY(-8px); }
+  100% { transform: scale(1); }
+}
+
+.emote {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  font-size: 20px;
+  line-height: 1;
+  color: #ff6fa6;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 18%);
+  pointer-events: none;
+  animation: emote-float 0.7s ease-out forwards;
+}
+
+@keyframes emote-float {
+  0% { opacity: 0; transform: translateX(-50%) translateY(0) scale(0.6); }
+  25% { opacity: 1; transform: translateX(-50%) translateY(-6px) scale(1); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-36px) scale(1); }
+}
