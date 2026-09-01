@@ -2,6 +2,9 @@
 
 DeepSeek Harness（dsh）的桌面精灵插件：在 Web UI 右下角悬浮一只双马尾萌娘，实时反映 agent 的运行状态。
 
+<img width="1046" height="311" alt="image" src="https://github.com/user-attachments/assets/593ae249-18b2-4ee7-ae2d-6b454e33b31d" />
+
+
 ## 状态
 
 精灵从全局会话列表（`useSessions` 标准钩子）推导四种状态，优先级从高到低：
