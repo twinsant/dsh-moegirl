@@ -36,7 +36,7 @@ pnpm run build        # 产出 lib/index.js 与 lib/client.js
 ## 安装到 profile
 
 ```sh
-dsh plugin --profile web add file:/Users/twinsant/projects/dhs-moegirl
+dsh plugin --profile web add file:"$PWD"
 dsh --profile web
 ```
 
@@ -47,3 +47,13 @@ dsh --profile web
 ```sh
 dsh plugin --profile web remove dsh-moegirl
 ```
+
+## 素材
+
+`src/client/assets/` 下的角色素材为本项目自制（AI 生成），随本仓库以 MIT 授权发布。
+`moegirl-sheet.webp` 是实际使用的 5 帧精灵图，压缩自 `moegirl-sheet.png`；构建时以
+编译期 data URI 内联进 `lib/client.js`，因此产物不依赖外部图片请求。
+
+## 许可
+
+[MIT](LICENSE)
