@@ -46,6 +46,27 @@
   border: 1px solid rgb(236 108 168 / 35%);
 }
 
+/* The bubble renders as a button when it has a session to open: reset the
+   control defaults so it keeps the bubble's look, and add an affordance. */
+.bubble.openable {
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.bubble.openable:hover,
+.bubble.openable:focus-visible {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 20%);
+}
+
+.bubble.openable:active {
+  transform: translateY(0);
+}
+
 .count {
   margin-left: 4px;
   color: #a8848f;
@@ -93,6 +114,18 @@
   30% { transform: translateY(-7px) rotate(-3deg); }
   60% { transform: translateY(0) rotate(0deg); }
   80% { transform: translateY(-3px) rotate(2deg); }
+}
+
+/* approval: a patient, insistent nudge — the user still owes a decision, so
+   the sprite leans and taps rather than bouncing like `working`. */
+.root[data-mood='approval'] .figure {
+  animation: await-decision 2.4s ease-in-out infinite;
+}
+
+@keyframes await-decision {
+  0%, 58%, 100% { transform: translateY(0) rotate(0deg); }
+  70% { transform: translateY(-4px) rotate(-1.8deg); }
+  82% { transform: translateY(0) rotate(1.2deg); }
 }
 
 /* ── click reaction: quick squash-stretch pop + floating heart ────────── */
