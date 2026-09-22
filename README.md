@@ -2,6 +2,9 @@
 
 DeepSeek Harness（dsh）的桌面精灵插件：在 Web UI 右下角悬浮一只双马尾萌娘，实时反映 agent 的运行状态。
 
+<img width="1046" height="311" alt="image" src="https://github.com/user-attachments/assets/593ae249-18b2-4ee7-ae2d-6b454e33b31d" />
+
+
 ## 状态
 
 精灵从全局会话列表（`useSessions` 标准钩子）推导四种状态，优先级从高到低：
@@ -40,7 +43,7 @@ dsh plugin --profile web add file:"$PWD"
 dsh --profile web
 ```
 
-打开 Web UI（默认 http://127.0.0.1:3080）即可看到右下角的精灵。修改代码后重新 `pnpm run build`，再执行 `dsh plugin --profile web update dsh-moegirl`（或重新 add）并刷新页面。
+打开 Web UI（默认 http://127.0.0.1:3080 ）即可看到右下角的精灵。修改代码后重新 `pnpm run build`，再执行 `dsh plugin --profile web update dsh-moegirl`（或重新 add）并刷新页面。
 
 ## 卸载
 
