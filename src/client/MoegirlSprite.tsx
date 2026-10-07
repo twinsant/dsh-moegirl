@@ -1,19 +1,26 @@
 /**
- * The moegirl desktop sprite: a chibi twin-tail girl floating at the
- * bottom-right corner of the shell overlay, mirroring live agent status.
- * Five moods, highest-priority fact wins — approval (a session blocked on the
+ * The moegirl desktop sprite: a chibi character floating at the bottom-right
+ * corner of the shell overlay, mirroring live agent status.
+ *
+ * Five states, highest-priority fact wins — approval (a session blocked on the
  * user's allow/deny decision) > attention (any other pending interaction:
  * plan-review, question) > working (any session running) > done (an off-screen
- * session finished) > idle. Pure presentation: pending interactions arrive
- * through the runtime share's useSessionPendingInteraction hook and session
- * activity through useSessions.
+ * session finished) > idle. Pending interactions arrive through the runtime
+ * share's useSessionPendingInteraction hook and session activity through
+ * useSessions.
+ *
+ * Everything visual comes from a sprite pack: which frame a state shows, the
+ * frame sequence and transform motion it plays, and what its bubble says. This
+ * component only decides which state is current, so a pack can be swapped
+ * without touching the plugin.
  */
-import { useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { CSSProperties } from 'react'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 // Type-only: pulls the ui-layout SlotMap merge (the 'shell.overlay' seat).
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
-import { SPRITE_SHEET, SPRITE_FRAME } from '../assets.ts'
+import { frameRow, playReaction, playState } from './pack-player.ts'
+import { currentPack, subscribePack } from './pack-source.ts'
 import css from './MoegirlSprite.module.css'
 
 /** Extra props this plugin injects into its own shell.overlay entry. */
@@ -25,19 +32,16 @@ export interface MoegirlInjected {
 /** Full composed props: runtime share (global standard kit), the locale seat, and the injected opener. */
 export type MoegirlSpriteProps = PropsRuntime<'shell.overlay'> & PropsLocale<'moegirl'> & MoegirlInjected
 
-/** Sprite mood discriminant, highest-priority live fact wins. */
+/** Sprite state discriminant, highest-priority live fact wins. */
 type Mood = 'idle' | 'working' | 'attention' | 'approval' | 'done'
-
-/** Vertical sprite-sheet frame index per mood (frame 1 is the idle blink). */
-const MOOD_FRAME: Record<Mood, number> = { idle: 0, working: 2, attention: 3, done: 4, approval: 5 }
 
 /**
  * Fold the pending-interaction map into one stable primitive: `approval:other`
  * counts on the first line and the session the bubble should open on the
  * second. An `approval` interaction wins the target over any other pending
- * kind, matching the mood precedence; the target is empty when none is pending.
- * The primitive result keeps the snapshot subscription quiet — object results
- * would republish on every map rebuild.
+ * kind, matching the state precedence; the target is empty when none is
+ * pending. The primitive result keeps the snapshot subscription quiet — object
+ * results would republish on every map rebuild.
  */
 function selectPending(map: ReadonlyMap<string, { kind?: string } | undefined>): string {
   let approval = 0
@@ -79,10 +83,14 @@ function selectSessions(s: { ids: readonly string[]; byId: Record<string, { runn
 
 /**
  * Render the sprite and its speech bubble.
- * @param props - composed slot props (runtime share + locale seat).
+ * @param props - composed slot props (runtime share + locale seat + injected opener).
  * @returns the sprite element tree.
  */
 export function MoegirlSprite({ useSessions, useSessionPendingInteraction, t, openSession }: MoegirlSpriteProps) {
+  // The installed pack when one is active, the built-in resource otherwise.
+  // Subscribing rather than prop-drilling keeps the pack out of the slot
+  // contract: the editor installs a pack and the sprite follows on its own.
+  const pack = useSyncExternalStore(subscribePack, currentPack)
   const [pendingCounts, pendingTarget] = useSessionPendingInteraction(selectPending).split('\n') as [string, string]
   const [sessionCounts, doneTarget] = useSessions(selectSessions).split('\n') as [string, string]
   const [approval, other] = pendingCounts.split(':').map(Number)
@@ -92,44 +100,57 @@ export function MoegirlSprite({ useSessions, useSessionPendingInteraction, t, op
       : working > 0 ? 'working'
         : done > 0 ? 'done'
           : 'idle'
-  // null = follow the mood's default (approval/attention/done bubble up on their own).
+  // null = follow the state's default (approval/attention/done bubble up on their own).
   const [pinned, setPinned] = useState<boolean | null>(null)
   const showBubble = pinned ?? (mood === 'approval' || mood === 'attention' || mood === 'done')
-  // The session the bubble opens: whichever fact elected the current mood.
+  // The session the bubble opens: whichever fact elected the current state.
   const jumpTarget = mood === 'approval' || mood === 'attention' ? pendingTarget : mood === 'done' ? doneTarget : ''
 
-  // Click reaction: a quick pop on the sprite + a floating heart emote.
-  // `reactKey` bumps the figure's key so the CSS animation replays on every
-  // click; `reacting` adds the .reacting class and clears when the pop ends.
+  const count = mood === 'working' ? working : mood === 'attention' ? other : mood === 'approval' ? approval : mood === 'done' ? done : 0
+
+  const figureRef = useRef<HTMLDivElement>(null)
+  const DISPLAY_W = 132
+  const DISPLAY_H = Math.round(DISPLAY_W * pack.frame.height / pack.frame.width)
+
+  // Start the state's tracks on every change and tear them down on the way out,
+  // so a pack edit or state switch never leaves an orphan animation running.
+  useEffect(() => {
+    const figure = figureRef.current
+    if (figure === null) return
+    const playback = playState(figure, pack, mood, DISPLAY_H)
+    return () => { playback.stop() }
+  }, [pack, mood, DISPLAY_H])
+
+  // Click reaction: the pack's one-shot flourish plus a floating emote. The
+  // emote replays by re-mounting on its own key.
   const [reacting, setReacting] = useState(false)
   const [reactKey, setReactKey] = useState(0)
   const triggerReact = () => {
     setReactKey(k => k + 1)
     setReacting(true)
+    const figure = figureRef.current
+    const finished = figure === null ? undefined : playReaction(figure, pack)
+    if (finished === undefined) setReacting(false)
+    else void finished.then(() => { setReacting(false) })
   }
 
-  const count = mood === 'working' ? working : mood === 'attention' ? other : mood === 'approval' ? approval : mood === 'done' ? done : 0
-
-  const frame = MOOD_FRAME[mood] ?? 0
-  const DISPLAY_W = 132
-  const DISPLAY_H = Math.round(DISPLAY_W * SPRITE_FRAME.height / SPRITE_FRAME.width)
+  const frame = frameRow(pack, pack.states[mood]?.frame ?? pack.fallback)
   const frameStyle = {
     width: DISPLAY_W,
     height: DISPLAY_H,
-    backgroundImage: `url(${SPRITE_SHEET})`,
-    backgroundSize: `${DISPLAY_W}px ${DISPLAY_H * SPRITE_FRAME.count}px`,
+    backgroundImage: `url(${pack.atlas.src})`,
+    backgroundSize: `${DISPLAY_W}px ${DISPLAY_H * pack.atlas.count}px`,
     backgroundPosition: `0 ${-frame * DISPLAY_H}px`,
-    // Frame height in display px, consumed by the CSS blink keyframe to
-    // shift background-position-y to the closed-eyes frame (1).
-    '--frame-h': `${DISPLAY_H}px`,
   } as CSSProperties
+
+  const bubble = t(`state.${mood}.bubble` as never)
 
   return (
     <div className={css.root} data-mood={mood}>
       {showBubble && (jumpTarget === ''
         ? (
             <div className={css.bubble} role="status">
-              {t(`bubble.${mood}` as never)}
+              {bubble}
               {mood !== 'idle' && <span className={css.count}>{count} {t('bubble.count.sessions')}</span>}
             </div>
           )
@@ -138,10 +159,10 @@ export function MoegirlSprite({ useSessions, useSessionPendingInteraction, t, op
               type="button"
               className={`${css.bubble} ${css.openable}`}
               title={t('bubble.open.title')}
-              aria-label={`${t(`bubble.${mood}` as never)} ${t('bubble.open.title')}`}
+              aria-label={`${bubble} ${t('bubble.open.title')}`}
               onClick={() => { openSession(jumpTarget) }}
             >
-              {t(`bubble.${mood}` as never)}
+              {bubble}
               {mood !== 'idle' && <span className={css.count}>{count} {t('bubble.count.sessions')}</span>}
             </button>
           ))}
@@ -151,15 +172,8 @@ export function MoegirlSprite({ useSessions, useSessionPendingInteraction, t, op
         aria-label={t('sprite.aria')}
         onClick={() => { setPinned(showBubble ? false : true); triggerReact() }}
       >
-        <div
-          key={reactKey}
-          className={reacting ? `${css.figure} ${css.reacting}` : css.figure}
-          style={frameStyle}
-          role="img"
-          aria-hidden
-          onAnimationEnd={() => setReacting(false)}
-        />
-        {reacting && <span key={`emote-${reactKey}`} className={css.emote} aria-hidden>♥</span>}
+        <div ref={figureRef} className={css.figure} style={frameStyle} role="img" aria-hidden />
+        {reacting && <span key={`emote-${reactKey}`} className={css.emote} aria-hidden>{pack.reaction?.emote ?? ''}</span>}
       </button>
     </div>
   )

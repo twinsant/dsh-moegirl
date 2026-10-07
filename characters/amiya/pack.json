@@ -1,0 +1,109 @@
+{
+  "format": "dsh-moegirl/pack",
+  "version": 1,
+  "id": "amiya",
+  "name": "阿米娅 Q 版",
+  "frame": { "width": 384, "height": 704 },
+  "atlas": { "src": "atlas.png", "count": 6 },
+  "frames": {
+    "idle": 0,
+    "blink": 1,
+    "working": 2,
+    "attention": 3,
+    "done": 4,
+    "approval": 5
+  },
+  "sequences": {
+    "blink": {
+      "steps": true,
+      "segments": [
+        { "frame": "idle", "hold": 4.512 },
+        { "frame": "blink", "hold": 0.288 }
+      ]
+    }
+  },
+  "motions": {
+    "breathe": {
+      "duration": 3.2,
+      "easing": "ease-in-out",
+      "track": [
+        { "at": 0, "translateY": 0 },
+        { "at": 0.5, "translateY": -3 },
+        { "at": 1, "translateY": 0 }
+      ]
+    },
+    "hop": {
+      "duration": 0.6,
+      "easing": "ease-in-out",
+      "track": [
+        { "at": 0, "translateY": 0, "scale": 1 },
+        { "at": 0.2, "translateY": 1, "scale": [1.03, 0.97] },
+        { "at": 0.55, "translateY": -11, "scale": [0.99, 1.01] },
+        { "at": 1, "translateY": 0, "scale": 1 }
+      ]
+    },
+    "rejoice": {
+      "duration": 1.1,
+      "easing": "ease-in-out",
+      "track": [
+        { "at": 0, "translateY": 0, "rotate": 0 },
+        { "at": 0.25, "translateY": -2, "scale": [1.04, 0.96] },
+        { "at": 0.5, "translateY": -14, "rotate": -2 },
+        { "at": 0.75, "translateY": 0, "scale": [1.03, 0.97] },
+        { "at": 1, "translateY": 0, "rotate": 0, "scale": 1 }
+      ]
+    },
+    "await-decision": {
+      "duration": 2.4,
+      "easing": "ease-in-out",
+      "track": [
+        { "at": 0, "translateY": 0, "rotate": 0 },
+        { "at": 0.58, "translateY": 0, "rotate": 0 },
+        { "at": 0.7, "translateY": -3, "rotate": -1.5 },
+        { "at": 0.82, "translateY": 0, "rotate": 1 },
+        { "at": 1, "translateY": 0, "rotate": 0 }
+      ]
+    },
+    "reaction": {
+      "duration": 0.7,
+      "easing": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "once": true,
+      "track": [
+        { "at": 0, "scale": 1 },
+        { "at": 0.3, "scale": [1.05, 0.95] },
+        { "at": 0.6, "scale": [0.97, 1.03], "translateY": -7 },
+        { "at": 1, "scale": 1 }
+      ]
+    }
+  },
+  "states": {
+    "idle": {
+      "frame": "idle",
+      "sequence": "blink",
+      "motion": "breathe",
+      "bubble": { "zh": "现在没有任务，歇一会儿～", "en": "No tasks right now, taking a break~" }
+    },
+    "working": {
+      "frame": "working",
+      "motion": "hop",
+      "bubble": { "zh": "正在处理…", "en": "Working on it…" }
+    },
+    "attention": {
+      "frame": "attention",
+      "motion": "breathe",
+      "bubble": { "zh": "有会话在等待你的操作！", "en": "A session is waiting for you!" }
+    },
+    "approval": {
+      "frame": "approval",
+      "motion": "await-decision",
+      "bubble": { "zh": "有会话等你批准！", "en": "A session is waiting for your approval!" }
+    },
+    "done": {
+      "frame": "done",
+      "motion": "rejoice",
+      "bubble": { "zh": "做完了，去看看吧～", "en": "Done! Take a look~" }
+    }
+  },
+  "fallback": "idle",
+  "reaction": { "motion": "reaction", "emote": "💙" }
+}

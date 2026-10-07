@@ -14,17 +14,25 @@ import type { UserConfig } from 'tsdown'
 
 const PACKAGE_ID = 'dsh-moegirl'
 
-/** Shell-seeded module-table rows (PLATFORM_MODULES + PRELOADED_CLIENT_EXTERNALS). */
-const CLIENT_EXTERNALS = new Set([
+/**
+ * Shell-seeded module-table rows: `PLATFORM_MODULES` from
+ * packages/client/web/src/platform.ts, verbatim. These must be declared as
+ * rolldown `external` rather than only `neverBundle`: an external specifier is
+ * never resolved, while a bundles-excluded one still is, and the tsconfig path
+ * mapping points at a `.d.ts` whose own relative imports do not exist.
+ */
+const CLIENT_EXTERNALS = [
   'react',
   'react/jsx-runtime',
   'react-dom',
   'react-dom/client',
   '@deepseek-ai/cordis',
+  '@deepseek-ai/dsh-client-store',
   '@deepseek-ai/dsh-client-ui-slots',
   '@deepseek-ai/dsh-client-ui-primitives',
-  '@deepseek-ai/dsh-client-runtime/client',
-])
+] as const
+
+const EXTERNAL_SET: ReadonlySet<string> = new Set(CLIENT_EXTERNALS)
 
 const CSS_VIRTUAL_PREFIX = '\0dsh-css:'
 const CSS_VIRTUAL_SUFFIX = '.mjs'
@@ -45,7 +53,7 @@ function styleInjectionModule(fileId: string, css: string, classMap: Readonly<Re
   ].join('\n')
 }
 
-const isExternal = (specifier: string): boolean => CLIENT_EXTERNALS.has(specifier)
+const isExternal = (specifier: string): boolean => EXTERNAL_SET.has(specifier)
 
 const client: UserConfig = {
   name: `${PACKAGE_ID}/client`,
@@ -57,6 +65,8 @@ const client: UserConfig = {
   dts: false,
   sourcemap: true,
   clean: false,
+  // Handed to rolldown directly so these specifiers are never resolved at all.
+  external: [...CLIENT_EXTERNALS],
   deps: {
     // Requested module-table rows stay imports; everything else inlines —
     // a require() the table cannot answer throws at boot.

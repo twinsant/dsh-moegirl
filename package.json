@@ -18,7 +18,6 @@
     "client": {
       "platform": "web",
       "inject": [
-        "@deepseek-ai/dsh-client-runtime",
         "@deepseek-ai/dsh-client-ui-layout",
         "@deepseek-ai/dsh-client-locale"
       ]
@@ -32,6 +31,7 @@
   },
   "license": "MIT",
   "devDependencies": {
+    "@types/node": "22.20.0",
     "@types/react": "~18.3.1",
     "lightningcss": "^1.27.0",
     "tsdown": "^0.15.0",

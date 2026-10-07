@@ -1,0 +1,249 @@
+{
+  "format": "dsh-moegirl/pack",
+  "version": 1,
+  "id": "blue-blob",
+  "name": "蓝色团子",
+  "frame": {
+    "width": 384,
+    "height": 512
+  },
+  "atlas": {
+    "src": "atlas.png",
+    "count": 6
+  },
+  "frames": {
+    "idle": 0,
+    "blink": 1,
+    "working": 2,
+    "attention": 3,
+    "done": 4,
+    "approval": 5
+  },
+  "sequences": {
+    "blink": {
+      "steps": true,
+      "segments": [
+        {
+          "frame": "idle",
+          "hold": 4.512
+        },
+        {
+          "frame": "blink",
+          "hold": 0.288
+        }
+      ]
+    }
+  },
+  "motions": {
+    "breathe": {
+      "duration": 3.2,
+      "easing": "ease-in-out",
+      "track": [
+        {
+          "at": 0,
+          "translateY": 0,
+          "scale": 1
+        },
+        {
+          "at": 0.5,
+          "translateY": -2,
+          "scale": [
+            1.02,
+            0.975
+          ]
+        },
+        {
+          "at": 1,
+          "translateY": 0,
+          "scale": 1
+        }
+      ]
+    },
+    "hop": {
+      "duration": 0.6,
+      "easing": "ease-in-out",
+      "track": [
+        {
+          "at": 0,
+          "translateY": 0,
+          "scale": 1
+        },
+        {
+          "at": 0.25,
+          "translateY": 0,
+          "scale": [
+            1.07,
+            0.91
+          ]
+        },
+        {
+          "at": 0.55,
+          "translateY": -10,
+          "scale": [
+            0.96,
+            1.05
+          ]
+        },
+        {
+          "at": 1,
+          "translateY": 0,
+          "scale": 1
+        }
+      ]
+    },
+    "rejoice": {
+      "duration": 1.1,
+      "easing": "ease-in-out",
+      "track": [
+        {
+          "at": 0,
+          "translateY": 0,
+          "rotate": 0,
+          "scale": 1
+        },
+        {
+          "at": 0.22,
+          "translateY": 2,
+          "rotate": 0,
+          "scale": [
+            1.08,
+            0.9
+          ]
+        },
+        {
+          "at": 0.45,
+          "translateY": -12,
+          "rotate": -3,
+          "scale": [
+            0.97,
+            1.05
+          ]
+        },
+        {
+          "at": 0.7,
+          "translateY": 0,
+          "rotate": 0,
+          "scale": [
+            1.06,
+            0.93
+          ]
+        },
+        {
+          "at": 1,
+          "translateY": 0,
+          "rotate": 0,
+          "scale": 1
+        }
+      ]
+    },
+    "await-decision": {
+      "duration": 2.4,
+      "easing": "ease-in-out",
+      "track": [
+        {
+          "at": 0,
+          "translateY": 0,
+          "rotate": 0
+        },
+        {
+          "at": 0.58,
+          "translateY": 0,
+          "rotate": 0
+        },
+        {
+          "at": 0.7,
+          "translateY": -4,
+          "rotate": -2
+        },
+        {
+          "at": 0.82,
+          "translateY": 0,
+          "rotate": 1.4
+        },
+        {
+          "at": 1,
+          "translateY": 0,
+          "rotate": 0
+        }
+      ]
+    },
+    "reaction": {
+      "duration": 0.7,
+      "easing": "cubic-bezier(0.34, 1.56, 0.64, 1)",
+      "once": true,
+      "track": [
+        {
+          "at": 0,
+          "scale": 1
+        },
+        {
+          "at": 0.3,
+          "scale": [
+            1.09,
+            0.89
+          ]
+        },
+        {
+          "at": 0.6,
+          "scale": [
+            0.94,
+            1.07
+          ],
+          "translateY": -9
+        },
+        {
+          "at": 1,
+          "scale": 1
+        }
+      ]
+    }
+  },
+  "states": {
+    "idle": {
+      "frame": "idle",
+      "sequence": "blink",
+      "motion": "breathe",
+      "bubble": {
+        "zh": "现在没有任务，发会儿呆～",
+        "en": "No tasks right now, spacing out~"
+      }
+    },
+    "working": {
+      "frame": "working",
+      "motion": "hop",
+      "bubble": {
+        "zh": "正在努力工作…",
+        "en": "Working hard…"
+      }
+    },
+    "attention": {
+      "frame": "attention",
+      "motion": "breathe",
+      "bubble": {
+        "zh": "有会话在等待你的操作！",
+        "en": "A session is waiting for you!"
+      }
+    },
+    "approval": {
+      "frame": "approval",
+      "motion": "await-decision",
+      "bubble": {
+        "zh": "有会话等你批准！",
+        "en": "A session is waiting for your approval!"
+      }
+    },
+    "done": {
+      "frame": "done",
+      "motion": "rejoice",
+      "bubble": {
+        "zh": "做完啦，去看看吧～",
+        "en": "Done! Take a look~"
+      }
+    }
+  },
+  "fallback": "idle",
+  "reaction": {
+    "motion": "reaction",
+    "emote": "💙"
+  }
+}
