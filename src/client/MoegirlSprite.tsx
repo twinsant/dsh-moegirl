@@ -4,10 +4,14 @@
  *
  * Five states, highest-priority fact wins — approval (a session blocked on the
  * user's allow/deny decision) > attention (any other pending interaction:
- * plan-review, question) > working (any session running) > done (an off-screen
- * session finished) > idle. Pending interactions arrive through the runtime
- * share's useSessionPendingInteraction hook and session activity through
- * useSessions.
+ * plan-review, question) > working (any session running) > done (a session
+ * stopped somewhere the user is not looking) > idle.
+ *
+ * All of that comes from one hook, `useSessionStatus`, which reports running
+ * state, the highest-precedence pending interaction, and unread completion per
+ * session. The 0.2 harness folded the two older sources (a session list plus a
+ * pending-interaction hook) into it; a plugin still calling the old ones gets
+ * `undefined` and throws on render, which is how the sprite silently vanished.
  *
  * Everything visual comes from a sprite pack: which frame a state shows, the
  * frame sequence and transform motion it plays, and what its bubble says. This
@@ -43,12 +47,51 @@ type Mood = 'idle' | 'working' | 'attention' | 'approval' | 'done'
  * pending. The primitive result keeps the snapshot subscription quiet — object
  * results would republish on every map rebuild.
  */
-function selectPending(map: ReadonlyMap<string, { kind?: string } | undefined>): string {
+/**
+ * One independent UI fact about one session, as the status snapshot reports it.
+ *
+ * The harness used to expose two separate sources — a session list for activity
+ * and a pending-interaction hook for blocked sessions. 0.2 replaced both with
+ * this single per-session status, so the sprite folds one map instead of joining
+ * two, and `completionUnread` already means "stopped somewhere you are not
+ * looking", which is exactly what the `done` mood wants.
+ */
+interface SessionStatusFact {
+  /** Latest known running state; absent until a baseline establishes it. */
+  readonly running?: boolean | undefined
+  /** Highest-precedence request currently awaiting the user. */
+  readonly pendingInteraction?: { readonly kind?: string } | undefined
+  /** A stop outside the main view still waiting to be acknowledged. */
+  readonly completionUnread?: boolean
+}
+
+/**
+ * Fold the status map into one stable primitive.
+ *
+ * `approval:other:working:done` counts on the first line, and the session the
+ * bubble should open on the second: an approval target wins over any other
+ * pending kind, which wins over a finished session, mirroring the mood
+ * precedence. A primitive keeps the snapshot subscription quiet — an object
+ * result would republish on every map rebuild.
+ * @param statuses - the session status snapshot.
+ * @returns the folded primitive.
+ */
+function selectStatus(statuses: ReadonlyMap<string, SessionStatusFact | undefined>): string {
   let approval = 0
   let other = 0
+  let working = 0
+  let done = 0
   let approvalTarget = ''
   let otherTarget = ''
-  for (const [id, interaction] of map) {
+  let doneTarget = ''
+  for (const [id, status] of statuses) {
+    if (status === undefined) continue
+    if (status.running === true) working += 1
+    if (status.completionUnread === true) {
+      done += 1
+      if (doneTarget === '') doneTarget = String(id)
+    }
+    const interaction = status.pendingInteraction
     if (interaction === undefined) continue
     if (interaction.kind === 'approval') {
       approval += 1
@@ -58,27 +101,8 @@ function selectPending(map: ReadonlyMap<string, { kind?: string } | undefined>):
       if (otherTarget === '') otherTarget = String(id)
     }
   }
-  return `${approval}:${other}\n${approval > 0 ? approvalTarget : otherTarget}`
-}
-
-/**
- * Fold the session list into one stable primitive: `working:done` counts on the
- * first line and the first finished-and-not-yet-open session on the second.
- */
-function selectSessions(s: { ids: readonly string[]; byId: Record<string, { running: boolean; completed?: boolean } | undefined> }): string {
-  let working = 0
-  let done = 0
-  let target = ''
-  for (const id of s.ids) {
-    const row = s.byId[id]
-    if (row === undefined) continue
-    if (row.running) working += 1
-    else if (row.completed === true) {
-      done += 1
-      if (target === '') target = String(id)
-    }
-  }
-  return `${working}:${done}\n${target}`
+  const target = approval > 0 ? approvalTarget : other > 0 ? otherTarget : doneTarget
+  return `${approval}:${other}:${working}:${done}\n${target}`
 }
 
 /**
@@ -86,15 +110,13 @@ function selectSessions(s: { ids: readonly string[]; byId: Record<string, { runn
  * @param props - composed slot props (runtime share + locale seat + injected opener).
  * @returns the sprite element tree.
  */
-export function MoegirlSprite({ useSessions, useSessionPendingInteraction, t, openSession }: MoegirlSpriteProps) {
+export function MoegirlSprite({ useSessionStatus, t, openSession }: MoegirlSpriteProps) {
   // The installed pack when one is active, the built-in resource otherwise.
   // Subscribing rather than prop-drilling keeps the pack out of the slot
   // contract: the editor installs a pack and the sprite follows on its own.
   const pack = useSyncExternalStore(subscribePack, currentPack)
-  const [pendingCounts, pendingTarget] = useSessionPendingInteraction(selectPending).split('\n') as [string, string]
-  const [sessionCounts, doneTarget] = useSessions(selectSessions).split('\n') as [string, string]
-  const [approval, other] = pendingCounts.split(':').map(Number)
-  const [working, done] = sessionCounts.split(':').map(Number)
+  const [counts, jumpTarget] = useSessionStatus(selectStatus).split('\n') as [string, string]
+  const [approval, other, working, done] = counts.split(':').map(Number)
   const mood: Mood = approval > 0 ? 'approval'
     : other > 0 ? 'attention'
       : working > 0 ? 'working'
@@ -103,8 +125,8 @@ export function MoegirlSprite({ useSessions, useSessionPendingInteraction, t, op
   // null = follow the state's default (approval/attention/done bubble up on their own).
   const [pinned, setPinned] = useState<boolean | null>(null)
   const showBubble = pinned ?? (mood === 'approval' || mood === 'attention' || mood === 'done')
-  // The session the bubble opens: whichever fact elected the current state.
-  const jumpTarget = mood === 'approval' || mood === 'attention' ? pendingTarget : mood === 'done' ? doneTarget : ''
+  // The session the bubble opens: whichever fact elected the current state,
+  // already resolved inside the selector so it stays a stable primitive.
 
   const count = mood === 'working' ? working : mood === 'attention' ? other : mood === 'approval' ? approval : mood === 'done' ? done : 0
 

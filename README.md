@@ -113,6 +113,26 @@ dsh --profile web
 
 装好的 profile 副本里 `lib/` 与项目是硬链接，重建即同步；`package.json` 与 `cordis.patch.yml` 是拷贝，改了声明需要重新同步。
 
+## 版本兼容
+
+针对 **DSH 0.2.x** 的客户端 API。harness 升级后先跑这两条，能挡住大部分破坏：
+
+```sh
+pnpm run sync:paths   # 重新对着当前 harness 生成路径映射
+pnpm run typecheck    # 类型定义一变，被删掉的 API 立刻报错
+```
+
+0.1 → 0.2 迁移过两处：
+
+| 0.1 | 0.2 | 说明 |
+|---|---|---|
+| `useSessionPendingInteraction(选择器)` + `useSessions` | `useSessionStatus(选择器)` | 状态合并成一张按会话 id 索引的表，含 `running` / `pendingInteraction` / `completionUnread` |
+| `sessions.open(id)` | `uiWorkspace.openSession(id)` | 会话服务的文档明说「navigation belongs to view owners」，`open()` 已移除 |
+
+**这类破坏的表现是「精灵整个不见了」，而不是报错。** 插件照常挂载，但组件渲染时调用一个已经不存在的标准 prop 会直接抛错，slot 子树被错误边界摘掉，页面其余部分照常工作——只在浏览器控制台留一条错误。排查顺序：先看控制台，再跑 `typecheck` 对着新 harness 验一遍。
+
+> 宿主侧可以单独验证，不需要浏览器：`curl http://127.0.0.1:3080/moegirl/packs/active`。这条通而精灵不出现，问题就在客户端。
+
 ## 测试
 
 ```sh

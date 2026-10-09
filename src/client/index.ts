@@ -12,8 +12,8 @@
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
-// Type-only: pulls the GlobalStandardProps merge (useSessions /
-// useSessionPendingInteraction) the sprite's mood derivation reads.
+// Type-only: pulls the GlobalStandardProps merge (useSessionStatus) the
+// sprite's mood derivation reads.
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 // Type-only: pulls the ui-layout SlotMap merge (the 'shell.overlay' seat).
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
@@ -21,6 +21,10 @@ import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 // Type-only: pulls the settings SlotMap merge (the 'settings.section' seat).
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+// Type-only: pulls the uiWorkspace Context merge. Navigation lives there as of
+// 0.2 — the sessions service says outright that "navigation belongs to view
+// owners", so its `open()` is gone.
+import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { MoegirlSprite, type MoegirlInjected } from './MoegirlSprite.tsx'
 import { MoegirlSection, type MoegirlSectionInjected } from './MoegirlSection.tsx'
 import { en, zh, type MoegirlKey, type MoegirlStateKey } from './locales.ts'
@@ -65,14 +69,14 @@ export function apply(ctx: ClientContext): void {
     return ctx.locale.register(NS, { zh: { ...zh, ...copy.zh }, en: { ...en, ...copy.en } })
   }
 
-  // The bubble opens the session whose fact elected the current mood. The
-  // session service is looked up per click instead of injected: the sprite
-  // still reports status when no session UI is mounted, and the bubble simply
-  // stays inert.
+  // The bubble opens the session whose fact elected the current mood.
+  // `uiWorkspace.openSession` is the 0.2 navigation entry point; it is looked up
+  // per click rather than injected, so the sprite still reports status when no
+  // workspace UI is mounted and the bubble simply stays inert.
   const injected = (): MoegirlInjected => ({
     openSession: (sessionId: string) => {
-      const sessions = ctx.get('sessions') as { open?: (id: string) => void } | undefined
-      sessions?.open?.(sessionId)
+      const workspace = ctx.get('uiWorkspace') as { openSession?: (target: string) => void } | undefined
+      workspace?.openSession?.(sessionId)
     },
   })
 
