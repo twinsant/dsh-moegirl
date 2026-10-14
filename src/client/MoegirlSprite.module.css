@@ -94,3 +94,17 @@
   25% { opacity: 1; transform: translateX(-50%) translateY(-6px) scale(1); }
   100% { opacity: 0; transform: translateX(-50%) translateY(-36px) scale(1); }
 }
+
+/* Rendered in place of the sprite when it throws, so a decorative widget never
+   disappears without saying why. */
+.failure {
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: #fff;
+  color: #a33;
+  font-size: 11px;
+  line-height: 1.5;
+  border: 1px solid rgb(200 60 60 / 40%);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 14%);
+  cursor: help;
+}

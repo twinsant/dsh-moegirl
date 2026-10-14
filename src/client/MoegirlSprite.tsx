@@ -18,8 +18,8 @@
  * component only decides which state is current, so a pack can be swapped
  * without touching the plugin.
  */
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import type { CSSProperties } from 'react'
+import { Component, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 // Type-only: pulls the ui-layout SlotMap merge (the 'shell.overlay' seat).
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
@@ -31,10 +31,18 @@ import css from './MoegirlSprite.module.css'
 export interface MoegirlInjected {
   /** Select one session as the current workspace selection. */
   openSession: (sessionId: string) => void
+  /**
+   * Translator bound to this plugin's namespace.
+   *
+   * Bound here rather than taken from the framework's `locale` seat: the entry
+   * then owns nothing but its own inject face, and a kit assembled without a
+   * locale seat can no longer take the sprite down.
+   */
+  t: PropsLocale<'moegirl'>['t']
 }
 
-/** Full composed props: runtime share (global standard kit), the locale seat, and the injected opener. */
-export type MoegirlSpriteProps = PropsRuntime<'shell.overlay'> & PropsLocale<'moegirl'> & MoegirlInjected
+/** Full composed props: runtime share (global standard kit) plus the injected face. */
+export type MoegirlSpriteProps = PropsRuntime<'shell.overlay'> & MoegirlInjected
 
 /** Sprite state discriminant, highest-priority live fact wins. */
 type Mood = 'idle' | 'working' | 'attention' | 'approval' | 'done'
@@ -110,12 +118,65 @@ function selectStatus(statuses: ReadonlyMap<string, SessionStatusFact | undefine
  * @param props - composed slot props (runtime share + locale seat + injected opener).
  * @returns the sprite element tree.
  */
-export function MoegirlSprite({ useSessionStatus, t, openSession }: MoegirlSpriteProps) {
+export function MoegirlSprite(props: MoegirlSpriteProps) {
+  return (
+    <SpriteBoundary>
+      <SpriteBody {...props} />
+    </SpriteBoundary>
+  )
+}
+
+/**
+ * Keep a sprite failure on screen instead of letting it vanish.
+ *
+ * The framework wraps each entry in its own boundary and retires a crashed
+ * entry from its cell, permanently. A production React build does not log the
+ * caught error either, so a broken sprite simply disappears with no trace
+ * anywhere. Catching it here keeps this decorative widget from being retired
+ * and shows the reason.
+ */
+class SpriteBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  override state: { error: Error | null } = { error: null }
+
+  static getDerivedStateFromError(error: Error): { error: Error } {
+    return { error }
+  }
+
+  override componentDidCatch(error: Error): void {
+    console.error('[moegirl] sprite render failed:', error)
+  }
+
+  override render(): ReactNode {
+    const { error } = this.state
+    if (error === null) return this.props.children
+    // Deliberately a literal, not a translated key: the translator itself is
+    // one of the things that can be missing, and a fallback that needs it would
+    // throw in the very situation it exists for.
+    return (
+      <div className={css.failure} role="status" title={error.message}>
+        ⚠ 精灵加载失败 · sprite failed
+      </div>
+    )
+  }
+}
+
+/**
+ * The sprite proper: the part that can throw, kept separate so the boundary
+ * above has something to catch.
+ * @param props - composed slot props.
+ * @returns the sprite element tree.
+ */
+function SpriteBody({ useSessionStatus, t, openSession }: MoegirlSpriteProps) {
   // The installed pack when one is active, the built-in resource otherwise.
   // Subscribing rather than prop-drilling keeps the pack out of the slot
   // contract: the editor installs a pack and the sprite follows on its own.
   const pack = useSyncExternalStore(subscribePack, currentPack)
-  const [counts, jumpTarget] = useSessionStatus(selectStatus).split('\n') as [string, string]
+  // A kit can legitimately arrive without this hook: the standard props are
+  // assembled per entry from contributions, and an entry that renders before
+  // the session contribution lands would otherwise call `undefined` and be
+  // retired for good. Absence means "no facts", which is the idle mood.
+  const folded = typeof useSessionStatus === 'function' ? useSessionStatus(selectStatus) : '0:0:0:0\n'
+  const [counts, jumpTarget] = folded.split('\n') as [string, string]
   const [approval, other, working, done] = counts.split(':').map(Number)
   const mood: Mood = approval > 0 ? 'approval'
     : other > 0 ? 'attention'

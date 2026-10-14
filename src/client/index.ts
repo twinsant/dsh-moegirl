@@ -78,13 +78,15 @@ export function apply(ctx: ClientContext): void {
       const workspace = ctx.get('uiWorkspace') as { openSession?: (target: string) => void } | undefined
       workspace?.openSession?.(sessionId)
     },
+    t: ctx.locale.bind(NS),
   })
 
   ctx.effect(
     () => ctx.slots.inject('shell.overlay', () => ctx.slots.register({
       name: 'shell.overlay',
       id: 'moegirl',
-      locale: NS,
+      // No `locale` seat: `t` rides the inject face instead, so the entry does
+      // not depend on the framework assembling a locale binding for it.
       label: 'Moegirl sprite',
       inject: injected,
     }, MoegirlSprite)),
@@ -101,7 +103,6 @@ export function apply(ctx: ClientContext): void {
       id: 'moegirl',
       order: 55,
       label: () => ctx.locale.bind(NS)('editor.nav'),
-      locale: NS,
       inject: section,
     }, MoegirlSection)),
     'dsh-moegirl: editor registration',
