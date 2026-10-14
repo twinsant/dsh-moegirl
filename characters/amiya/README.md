@@ -100,10 +100,11 @@ Nano Banana 的安全过滤会拦掉 prompt 里受版权保护的角色名（返
 | `../lib/cutout.py` | 抠底、统一缩放、底边对齐、拼图集（不走模型） |
 | `../lib/check.py` | 自检：底边、身体高度、道具对比度、装箱、图集规格 |
 | `../lib/install.sh` | 装进 `~/.dsh/moegirl/packs/amiya/` 并设为当前使用 |
-| `frames/0N-*.png` | 生成的原帧（洋红底，未处理） |
+| `source.png` | 用户给的整张素材，六格 768×1376 竖排、自带透明通道；`frames/` 由它切出来 |
+| `frames/0N-*.png` | 单帧。可以是洋红底的生成原帧，也可以是抠好的透明帧，`cutout.py` 自己认 |
 | `atlas.png` | 拼好的图集，六格 384×704 竖排 |
 | `pack.json` | 资源包文档（画布、帧名、帧序列、动作、气泡） |
-| `preview.png` | 浅色/深色主题下 1:1 显示尺寸对照 |
+| `preview.png` | 浅色/深色主题下 1:1 显示尺寸对照（`../lib/preview.py` 生成） |
 
 ## 状态与动作
 

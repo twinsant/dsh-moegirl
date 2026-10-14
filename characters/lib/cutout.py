@@ -7,6 +7,12 @@
 
 这一步**不走模型**，全是确定性的，所以可以随便重跑。
 
+输入有两种，脚本自己认：
+
+  * 模型直出的洋红底帧 → 走下面的抠底；
+  * 已经抠好、自带透明通道的帧（四角透明）→ 直接采用。再走一遍洋红抠底会把
+    alpha 当成底色参与反解，边缘会糊掉。
+
 为什么需要它（三件事各自解决一个问题）：
   1. 抠底：模型给的是纯洋红底。按「离底色的距离」算连续 alpha，再按
      P = a·F + (1-a)·B 反解前景色，边缘不留洋红描边。
@@ -85,6 +91,19 @@ def cutout(path: Path) -> tuple[Image.Image, float]:
     return Image.fromarray(out.astype(np.uint8), "RGBA"), float(distance.max())
 
 
+def load_frame(path: Path) -> tuple[Image.Image, str]:
+    """读一帧，返回带 alpha 的图和它走的通路（`precut` 或 `chroma`）。"""
+    source = Image.open(path)
+    if "A" in source.getbands():
+        rgba = source.convert("RGBA")
+        alpha = np.asarray(rgba)[..., 3]
+        height, width = alpha.shape
+        corners = [alpha[2, 2], alpha[2, width - 3], alpha[height - 3, 2], alpha[height - 3, width - 3]]
+        if max(corners) < 250:
+            return rgba, "precut"
+    return cutout(path), "chroma"
+
+
 def content_box(image: Image.Image) -> tuple[int, int, int, int]:
     """量不透明内容的包围盒。"""
     ys, xs = np.where(np.asarray(image)[..., 3] > ALPHA_SOLID)
@@ -109,10 +128,10 @@ def main() -> int:
 
     cut: list[tuple[str, Image.Image, tuple[int, int, int, int]]] = []
     for name in names:
-        image, max_distance = cutout(FRAMES_DIR / f"{name}.png")
+        image, route = load_frame(FRAMES_DIR / f"{name}.png")
         box = content_box(image)
         cut.append((name, image, box))
-        print(f"{name:12s} 内容框 {box[2] - box[0]:4d}×{box[3] - box[1]:4d}  最大色距 {max_distance:.0f}")
+        print(f"{name:12s} 内容框 {box[2] - box[0]:4d}×{box[3] - box[1]:4d}  {route}")
 
     canvas_w, canvas_h = character.CANVAS
     fit_w, fit_h = character.FIT
