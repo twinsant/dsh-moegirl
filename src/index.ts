@@ -17,11 +17,14 @@ import { join } from 'node:path'
 import { PACK_ROUTE_PREFIX } from './pack-api.ts'
 import { PackStore, resolveStoreRoot } from './pack-store.ts'
 import { createMoegirlHandler } from './routes.ts'
+import { offPeakAt } from './off-peak.ts'
 import { SpendLedger, type AccountBalanceReader } from './spend.ts'
 
 export { SpendLedger } from './spend.ts'
 export type { InstalledPack } from './pack-store.ts'
 export type { SpendSnapshot } from './spend.ts'
+export { offPeakAt, shanghaiDate } from './off-peak.ts'
+export type { OffPeakSchedule, OffPeakState } from './off-peak.ts'
 export type {
   PackErrorResponse,
   PackListResponse,
@@ -44,6 +47,12 @@ export interface Config {
   packsRoot?: string
   /** Balance poll period in milliseconds; defaults to 60000. */
   spendPollMs?: number
+  /**
+   * Chinese public holidays as `YYYY-MM-DD`, replacing the built-in 2026 table.
+   * The State Council republishes the list every year, so this is the knob that
+   * keeps the rate icon honest without a plugin release.
+   */
+  offPeakHolidays?: readonly string[]
 }
 
 /**
@@ -62,14 +71,33 @@ export function apply(ctx: Context, config: Config = {}): void {
   // has one; a row without it serves the last persisted figure instead of
   // failing to mount. `get` is re-checked on every poll because the account
   // plugin can come and go with the loader.
-  const spend = new SpendLedger(join(root, 'spend.json'))
+  const holidays = config.offPeakHolidays
+  const spend = new SpendLedger(
+    join(root, 'spend.json'),
+    'CNY',
+    Date.now,
+    holidays === undefined
+      ? undefined
+      : (now) => offPeakAt(new Date(now), { holidayRanges: holidays.map(day => [day, day] as const) }),
+  )
   const pollMs = config.spendPollMs ?? SPEND_POLL_MS
   ctx.effect(() => {
     let stopped = false
+    let lastReason: string | undefined
     const poll = (): void => {
       if (stopped) return
       const account = ctx.get('deepseekAccount') as AccountBalanceReader | undefined
-      void spend.refresh(() => account?.getBalance(ACCOUNT_CLIENT) ?? Promise.resolve(null))
+      void spend.refresh(() => account === undefined
+        ? Promise.reject(new Error('deepseekAccount service is not visible from this plugin'))
+        : account.getBalance(ACCOUNT_CLIENT)).then((snapshot) => {
+        // Log on change only: a poll every minute must not flood the terminal.
+        const reason = snapshot.available ? undefined : snapshot.reason ?? 'unknown'
+        if (reason !== lastReason) {
+          lastReason = reason
+          if (reason === undefined) console.log('[dsh-moegirl] spend readout is live')
+          else console.error('[dsh-moegirl] spend readout unavailable:', reason)
+        }
+      })
     }
     poll()
     const timer = setInterval(poll, pollMs)

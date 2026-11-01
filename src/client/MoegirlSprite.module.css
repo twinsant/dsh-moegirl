@@ -83,6 +83,11 @@
   cursor: default;
 }
 
+.spendIcon {
+  font-size: 12px;
+  line-height: 1;
+}
+
 .spendLabel {
   color: #a8848f;
 }

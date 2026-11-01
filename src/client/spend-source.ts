@@ -24,6 +24,10 @@ export interface SpendView {
   readonly updatedAt: number | null
   /** False while signed out or after a failed query. */
   readonly available: boolean
+  /** True while DeepSeek bills at off-peak (half) rates. */
+  readonly offPeak: boolean
+  /** Epoch milliseconds of the next rate switch, when the host reported one. */
+  readonly nextSwitchAt?: number
 }
 
 let current: SpendView | undefined
@@ -56,6 +60,8 @@ function signatureOf(view: SpendView | undefined): string {
     view.currency,
     view.balance === null ? '' : view.balance,
     view.available ? 1 : 0,
+    view.offPeak ? 1 : 0,
+    view.nextSwitchAt ?? '',
   ].join('|')
 }
 

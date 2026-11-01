@@ -237,14 +237,23 @@ function SpriteBody({ useSessionStatus, t, openSession }: MoegirlSpriteProps) {
 
   const bubble = t(`state.${mood}.bubble` as never)
 
-  const spendTitle = spend !== undefined && spend.available && spend.balance !== null
-    ? `${t('spend.today')} ${formatMoney(spend.spent, spend.currency)} · ${t('spend.balance')} ${formatMoney(spend.balance, spend.currency)}`
-    : undefined
+  let spendTitle: string | undefined
+  if (spend !== undefined && spend.available) {
+    const money = spend.balance === null
+      ? `${t('spend.today')} ${formatMoney(spend.spent, spend.currency)}`
+      : `${t('spend.today')} ${formatMoney(spend.spent, spend.currency)} · ${t('spend.balance')} ${formatMoney(spend.balance, spend.currency)}`
+    const rate = spend.offPeak ? t('spend.offPeak') : t('spend.peak')
+    const switchAt = spend.nextSwitchAt === undefined
+      ? ''
+      : ` · ${new Date(spend.nextSwitchAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ${t('spend.switchAt')}`
+    spendTitle = `${money} · ${rate}${switchAt}`
+  }
 
   return (
     <div className={css.root} data-mood={mood}>
       {spend !== undefined && spend.available && (
         <div className={css.spend} role="status" title={spendTitle}>
+          <span className={css.spendIcon} aria-hidden>{spend.offPeak ? '🌙' : '☀️'}</span>
           <span className={css.spendLabel}>{t('spend.today')}</span>
           <span className={css.spendAmount}>{formatMoney(spend.spent, spend.currency)}</span>
         </div>

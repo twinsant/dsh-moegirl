@@ -273,6 +273,40 @@ const spendSecond = await json(await call('GET', '/moegirl/spend'))
 check('余额下降 10 元后 spent 增长到 10', spendSecond.spent === 10, JSON.stringify(spendSecond))
 check('GET /spend 禁止缓存', (await call('GET', '/moegirl/spend')).headers['cache-control'] === 'no-store')
 
+// ── 闲时/峰时判定（官方规则：周一至周五 01-04、06-10 UTC 为峰时，节假日除外）──
+{
+  const { offPeakAt, shanghaiDate } = await import(join(REPO, 'lib/index.js'))
+  const at = (iso) => offPeakAt(new Date(iso))
+  const peak = (iso) => at(iso).offPeak === false
+
+  check('周一 02:00 UTC 是峰时', peak('2026-11-02T02:00:00Z'), JSON.stringify(at('2026-11-02T02:00:00Z')))
+  check('周一 07:00 UTC 是峰时', peak('2026-11-02T07:00:00Z'))
+  check('周一 05:00 UTC 空档是闲时', !peak('2026-11-02T05:00:00Z'))
+  check('峰时窗口终点 04:00 不算峰时（右开）', !peak('2026-11-02T04:00:00Z'))
+  check('峰时窗口起点 01:00 算峰时', peak('2026-11-02T01:00:00Z'))
+  check('周一 00:30 UTC 是闲时', !peak('2026-11-02T00:30:00Z'))
+  check('周六 02:00 UTC 闲时', !peak('2026-11-07T02:00:00Z'))
+  check('周日 07:00 UTC 闲时', !peak('2026-11-01T07:00:00Z'))
+  check('春节周一 02:00 UTC 闲时', !peak('2026-02-16T02:00:00Z'))
+  check('元旦周四 02:00 UTC 闲时', !peak('2026-01-01T02:00:00Z'))
+  check('国庆周一 07:00 UTC 闲时', !peak('2026-10-05T07:00:00Z'))
+  check('节后首个工作日恢复峰时', peak('2026-02-24T02:00:00Z'), '2026-02-24 是春节后第一天')
+
+  const before = at('2026-11-02T00:30:00Z')
+  check('下次切换时间落在 01:00 UTC', new Date(before.nextSwitchAt).toISOString() === '2026-11-02T01:00:00.000Z', String(before.nextSwitchAt))
+
+  const during = at('2026-11-02T02:00:00Z')
+  check('峰时中的下次切换是 04:00 UTC', new Date(during.nextSwitchAt).toISOString() === '2026-11-02T04:00:00.000Z', String(during.nextSwitchAt))
+
+  check('上海日期换算', shanghaiDate(new Date('2026-11-02T16:30:00Z')) === '2026-11-03', shanghaiDate(new Date('2026-11-02T16:30:00Z')))
+  check('自定义节假日覆盖内置表', offPeakAt(new Date('2026-11-02T02:00:00Z'), { holidayRanges: [['2026-11-02', '2026-11-02']] }).offPeak === true)
+}
+
+// 路由快照要带费率字段
+const spendWithRate = await json(await call('GET', '/moegirl/spend'))
+check('GET /spend 带 offPeak 布尔值', typeof spendWithRate.offPeak === 'boolean', JSON.stringify(spendWithRate))
+check('GET /spend 带下次切换时间', typeof spendWithRate.nextSwitchAt === 'number', String(spendWithRate.nextSwitchAt))
+
 const failed = results.filter(ok => !ok).length
 console.log(`\n${results.length - failed}/${results.length} 通过`)
 process.exit(failed === 0 ? 0 : 1)

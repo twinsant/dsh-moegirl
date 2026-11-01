@@ -14,6 +14,7 @@
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
+import { offPeakAt, type OffPeakState } from './off-peak.ts'
 
 /** One wallet row of the account balance answer. */
 export interface AccountWalletLike {
@@ -61,6 +62,16 @@ export interface SpendSnapshot {
   readonly updatedAt: number | null
   /** False while the account is signed out or the last query failed. */
   readonly available: boolean
+  /**
+   * Why the last reading is unavailable, when it is. Kept on the snapshot so a
+   * broken account binding is diagnosable from the route instead of only from
+   * the host log.
+   */
+  readonly reason?: string
+  /** True while DeepSeek bills at off-peak (half) rates. */
+  readonly offPeak: boolean
+  /** Epoch milliseconds of the next peak/off-peak switch, when known. */
+  readonly nextSwitchAt?: number
 }
 
 /** Persisted ledger row. */
@@ -125,6 +136,7 @@ export class SpendLedger {
     private readonly file: string,
     private readonly currency = 'CNY',
     private readonly now: () => number = Date.now,
+    private readonly rate: (now: number) => OffPeakState = (now) => offPeakAt(new Date(now)),
   ) {
     this.state = this.load()
     this.snapshot = {
@@ -134,12 +146,20 @@ export class SpendLedger {
       balance: null,
       updatedAt: null,
       available: false,
+      offPeak: true,
     }
   }
 
-  /** Current figure, without touching the account service. */
+  /**
+   * Current figure, without touching the account service.
+   *
+   * The rate period is re-read here rather than cached with the money: the
+   * route is hit at least once a minute, and the period flips on a clock
+   * boundary that has nothing to do with the last balance poll.
+   * @returns the snapshot with a fresh peak/off-peak flag.
+   */
   current(): SpendSnapshot {
-    return this.snapshot
+    return { ...this.snapshot, ...this.rate(this.now()) }
   }
 
   /**
@@ -151,11 +171,31 @@ export class SpendLedger {
     let balance: BalanceLike | null
     try {
       balance = await read()
-    } catch {
-      balance = null
+    } catch (error) {
+      this.snapshot = {
+        ...this.snapshot,
+        available: false,
+        offPeak: this.current().offPeak,
+        reason: `query failed: ${error instanceof Error ? error.message : String(error)}`,
+      }
+      return this.snapshot
     }
-    if (balance === null || balance.status !== 'ready') {
-      this.snapshot = { ...this.snapshot, available: false }
+    if (balance === null) {
+      this.snapshot = {
+        ...this.snapshot,
+        available: false,
+        offPeak: this.current().offPeak,
+        reason: 'signed out (no account grant for this origin)',
+      }
+      return this.snapshot
+    }
+    if (balance.status !== 'ready') {
+      this.snapshot = {
+        ...this.snapshot,
+        available: false,
+        offPeak: this.current().offPeak,
+        reason: 'platform returned a failed balance query',
+      }
       return this.snapshot
     }
 
@@ -180,6 +220,7 @@ export class SpendLedger {
       balance: fromCents(total),
       updatedAt: timestamp,
       available: true,
+      ...this.rate(timestamp),
     }
     return this.snapshot
   }
