@@ -30,10 +30,13 @@ import { MoegirlSection, type MoegirlSectionInjected } from './MoegirlSection.ts
 import { en, zh, type MoegirlKey, type MoegirlStateKey } from './locales.ts'
 import { packDictionaries } from '../pack-format.ts'
 import { currentPack, refreshPack, subscribePack } from './pack-source.ts'
+import { startSpendPolling } from './spend-source.ts'
 
 export type { MoegirlSpriteProps, MoegirlInjected } from './MoegirlSprite.tsx'
 export type { MoegirlKey } from './locales.ts'
 export { currentPack, refreshPack, subscribePack } from './pack-source.ts'
+export { currentSpend, refreshSpend, subscribeSpend } from './spend-source.ts'
+export type { SpendView } from './spend-source.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -68,6 +71,17 @@ export function apply(ctx: ClientContext): void {
     const copy = packDictionaries(currentPack())
     return ctx.locale.register(NS, { zh: { ...zh, ...copy.zh }, en: { ...en, ...copy.en } })
   }
+
+  /** How often the browser re-reads today's spend from the host. */
+  const SPEND_POLL_MS = 60_000
+
+  // One shared poll for the spend bubble: the host owns the balance query, so
+  // the browser only fetches its cached figure. Aborted with the fiber.
+  ctx.effect(() => {
+    const controller = new AbortController()
+    const stop = startSpendPolling(SPEND_POLL_MS, controller.signal)
+    return () => { controller.abort(); stop() }
+  }, 'dsh-moegirl: spend polling')
 
   // The bubble opens the session whose fact elected the current mood.
   // `uiWorkspace.openSession` is the 0.2 navigation entry point; it is looked up

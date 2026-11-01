@@ -19,6 +19,7 @@ import {
   type PackErrorResponse,
   type PackListResponse,
 } from './pack-api.ts'
+import type { SpendSnapshot } from './spend.ts'
 import type { PackStore } from './pack-store.ts'
 import type { SpritePack } from './pack-format.ts'
 
@@ -103,7 +104,12 @@ function shapeOf(req: IncomingMessage): RequestShape | undefined {
 }
 
 /** Answer one request inside the claimed prefix. */
-async function dispatch(store: PackStore, req: IncomingMessage, res: ServerResponse): Promise<void> {
+async function dispatch(
+  store: PackStore,
+  spend: () => SpendSnapshot,
+  req: IncomingMessage,
+  res: ServerResponse,
+): Promise<void> {
   const shape = shapeOf(req)
   if (shape === undefined) {
     sendError(res, 404, 'not found')
@@ -111,6 +117,12 @@ async function dispatch(store: PackStore, req: IncomingMessage, res: ServerRespo
   }
   const { method, segments } = shape
   const [head, second, third] = segments
+
+  // GET /moegirl/spend — today's spend, polled by the sprite bubble.
+  if (head === 'spend' && second === undefined && method === 'GET') {
+    sendJson(res, 200, spend())
+    return
+  }
 
   // GET /moegirl — a self-describing index, so the surface is discoverable
   // without reading the plugin source.
@@ -291,10 +303,13 @@ async function readAtlas(store: PackStore, id: string, file: string): Promise<Bu
  * @param store - the pack store to serve.
  * @returns the request handler, which never rejects: every failure is a response.
  */
-export function createMoegirlHandler(store: PackStore): (req: IncomingMessage, res: ServerResponse) => Promise<void> {
+export function createMoegirlHandler(
+  store: PackStore,
+  spend: () => SpendSnapshot,
+): (req: IncomingMessage, res: ServerResponse) => Promise<void> {
   return async (req, res) => {
     try {
-      await dispatch(store, req, res)
+      await dispatch(store, spend, req, res)
     } catch (error) {
       // A handler that throws after headers are sent cannot be repaired, and
       // the web server owns no error page for a JSON prefix.

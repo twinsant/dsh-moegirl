@@ -26,6 +26,9 @@ export const PACK_ACTIVE_PATH = `${PACK_ROUTE_PREFIX}/packs/active`
  */
 export const PACK_ACTIVATE_PATH = `${PACK_ROUTE_PREFIX}/active`
 
+/** `GET` today's spend, read from the account balance by the host half. */
+export const SPEND_PATH = `${PACK_ROUTE_PREFIX}/spend`
+
 /**
  * The document route for one pack: `GET` to read, `PUT` to install or replace,
  * `DELETE` to remove.

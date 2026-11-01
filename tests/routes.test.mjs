@@ -31,7 +31,25 @@ const webCtx = {
     register: (route) => { routes.set(route.path, route); return () => routes.delete(route.path) },
   },
 }
-apply({ inject: (_deps, callback) => { callback(webCtx) } }, { packsRoot: root })
+
+/** Balance the fake account answers with, in cents; tests move it to simulate spend. */
+let balanceCents = 10_000
+const fakeAccount = {
+  getBalance: async () => ({
+    status: 'ready',
+    value: [{ currency: 'CNY', balance: (balanceCents / 100).toFixed(2) }],
+    bonusWallets: [],
+  }),
+}
+
+const disposers = []
+const ctx = {
+  inject: (_deps, callback) => { callback(webCtx) },
+  effect: (fn) => { const dispose = fn(); disposers.push(dispose); return () => {} },
+  get: (name) => (name === 'deepseekAccount' ? fakeAccount : undefined),
+}
+// 50ms so the test can observe a second poll without waiting a minute.
+apply(ctx, { packsRoot: root, spendPollMs: 50 })
 console.log(`仓库 ${root}`)
 console.log(`注册的路由 ${[...routes.keys()].join(', ')}\n`)
 
@@ -203,6 +221,57 @@ check('删掉激活中的包后指针一并失效', response.status === 404)
 
 const stored = await readFile(join(root, 'packs', 'test', 'pack.json'), 'utf8').catch(() => null)
 check('删除后磁盘也清干净', stored === null)
+
+// ── 今日花费：账本逻辑 + /spend 路由 ──────────────────────────────────────
+const { SpendLedger } = await import(join(REPO, 'lib/index.js'))
+
+// 账本是纯逻辑：注入时钟，单测货币累积规则
+{
+  let clock = Date.parse('2026-11-01T10:00:00+08:00')
+  const file = join(root, 'ledger-unit.json')
+  const ledger = new SpendLedger(file, 'CNY', () => clock)
+  const read = (cents) => async () => ({
+    status: 'ready',
+    value: [{ currency: 'CNY', balance: (cents / 100).toFixed(2) }],
+  })
+
+  const first = await ledger.refresh(read(10_000))
+  check('账本首读只设基准，不算花费', first.spent === 0 && first.balance === 100, JSON.stringify(first))
+
+  clock += 60_000
+  const spent1 = await ledger.refresh(read(9_700))
+  check('余额下降计入今日花费', spent1.spent === 3, `spent=${spent1.spent}`)
+
+  clock += 60_000
+  const topUp = await ledger.refresh(read(50_000))
+  check('充值不计入花费，只移动基准', topUp.spent === 3, `spent=${topUp.spent}`)
+
+  clock += 60_000
+  const spent2 = await ledger.refresh(read(49_500))
+  check('充值后继续累积', spent2.spent === 8, `spent=${spent2.spent}`)
+
+  const restored = new SpendLedger(file, 'CNY', () => clock)
+  check('账本跨实例持久化', restored.current().spent === 8, `spent=${restored.current().spent}`)
+
+  clock = Date.parse('2026-11-02T00:01:00+08:00')
+  const nextDay = await ledger.refresh(read(49_000))
+  check('跨天重置', nextDay.spent === 0 && nextDay.date === '2026-11-02', `${nextDay.date} spent=${nextDay.spent}`)
+
+  const unreachable = await ledger.refresh(async () => null)
+  check('账户不可用时不丢失已有数字', unreachable.available === false && unreachable.spent === 0, JSON.stringify(unreachable))
+}
+
+// 路由：首轮轮询后 /spend 应带 available + 余额；余额下降后 spent 增长
+await new Promise(resolve => setTimeout(resolve, 120))
+const spendFirst = await json(await call('GET', '/moegirl/spend'))
+check('GET /spend 首轮可用', spendFirst.available === true, JSON.stringify(spendFirst))
+check('GET /spend 带货币与余额', spendFirst.currency === 'CNY' && spendFirst.balance === 100, JSON.stringify(spendFirst))
+
+balanceCents = 9_000
+await new Promise(resolve => setTimeout(resolve, 180))
+const spendSecond = await json(await call('GET', '/moegirl/spend'))
+check('余额下降 10 元后 spent 增长到 10', spendSecond.spent === 10, JSON.stringify(spendSecond))
+check('GET /spend 禁止缓存', (await call('GET', '/moegirl/spend')).headers['cache-control'] === 'no-store')
 
 const failed = results.filter(ok => !ok).length
 console.log(`\n${results.length - failed}/${results.length} 通过`)

@@ -25,7 +25,13 @@ import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import { frameRow, playReaction, playState } from './pack-player.ts'
 import { currentPack, subscribePack } from './pack-source.ts'
+import { currentSpend, subscribeSpend } from './spend-source.ts'
 import css from './MoegirlSprite.module.css'
+
+/** Render a money figure with its wallet symbol. */
+function formatMoney(value: number, currency: string): string {
+  return `${currency === 'USD' ? '$' : '¥'}${value.toFixed(2)}`
+}
 
 /** Extra props this plugin injects into its own shell.overlay entry. */
 export interface MoegirlInjected {
@@ -176,6 +182,9 @@ function SpriteBody({ useSessionStatus, t, openSession }: MoegirlSpriteProps) {
   // the session contribution lands would otherwise call `undefined` and be
   // retired for good. Absence means "no facts", which is the idle mood.
   const folded = typeof useSessionStatus === 'function' ? useSessionStatus(selectStatus) : '0:0:0:0\n'
+  // Today's spend, read from the host's balance ledger. Absent until the first
+  // poll answers, and hidden while the account is signed out.
+  const spend = useSyncExternalStore(subscribeSpend, currentSpend)
   const [counts, jumpTarget] = folded.split('\n') as [string, string]
   const [approval, other, working, done] = counts.split(':').map(Number)
   const mood: Mood = approval > 0 ? 'approval'
@@ -228,8 +237,18 @@ function SpriteBody({ useSessionStatus, t, openSession }: MoegirlSpriteProps) {
 
   const bubble = t(`state.${mood}.bubble` as never)
 
+  const spendTitle = spend !== undefined && spend.available && spend.balance !== null
+    ? `${t('spend.today')} ${formatMoney(spend.spent, spend.currency)} · ${t('spend.balance')} ${formatMoney(spend.balance, spend.currency)}`
+    : undefined
+
   return (
     <div className={css.root} data-mood={mood}>
+      {spend !== undefined && spend.available && (
+        <div className={css.spend} role="status" title={spendTitle}>
+          <span className={css.spendLabel}>{t('spend.today')}</span>
+          <span className={css.spendAmount}>{formatMoney(spend.spent, spend.currency)}</span>
+        </div>
+      )}
       {showBubble && (jumpTarget === ''
         ? (
             <div className={css.bubble} role="status">

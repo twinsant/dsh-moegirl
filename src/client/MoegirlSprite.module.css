@@ -66,6 +66,32 @@
   transform: translateY(0);
 }
 
+/* Today's spend: its own small bubble above the mood bubble, always visible so
+   the figure reads as a running meter rather than an alert. */
+.spend {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 10px;
+  background: #fff;
+  color: #4a3238;
+  font-size: 11px;
+  line-height: 1.4;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 14%);
+  border: 1px solid rgb(236 108 168 / 35%);
+  cursor: default;
+}
+
+.spendLabel {
+  color: #a8848f;
+}
+
+.spendAmount {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
 .count {
   margin-left: 4px;
   color: #a8848f;

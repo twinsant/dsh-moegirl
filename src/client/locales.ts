@@ -8,6 +8,8 @@
 
 export const zh = {
   'sprite.aria': '桌面精灵，显示 agent 运行状态',
+  'spend.today': '今日',
+  'spend.balance': '余额',
   'bubble.count.sessions': '个会话',
   'bubble.open.title': '点击跳到这个会话',
   'editor.nav': '桌面精灵',
@@ -96,6 +98,8 @@ export const zh = {
 
 export const en: Record<keyof typeof zh, string> = {
   'sprite.aria': 'Desktop sprite mirroring agent status',
+  'spend.today': 'Today',
+  'spend.balance': 'Balance',
   'bubble.count.sessions': 'sessions',
   'bubble.open.title': 'Open this session',
   'editor.nav': 'Desktop sprite',
