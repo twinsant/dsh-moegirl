@@ -242,18 +242,26 @@ function SpriteBody({ useSessionStatus, t, openSession }: MoegirlSpriteProps) {
     const money = spend.balance === null
       ? `${t('spend.today')} ${formatMoney(spend.spent, spend.currency)}`
       : `${t('spend.today')} ${formatMoney(spend.spent, spend.currency)} · ${t('spend.balance')} ${formatMoney(spend.balance, spend.currency)}`
-    const rate = spend.offPeak ? t('spend.offPeak') : t('spend.peak')
-    const switchAt = spend.nextSwitchAt === undefined
-      ? ''
-      : ` · ${new Date(spend.nextSwitchAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ${t('spend.switchAt')}`
-    spendTitle = `${money} · ${rate}${switchAt}`
+    // The host may predate the rate field (it is the build the process loaded,
+    // not the one on disk): say nothing rather than claim the wrong period.
+    let rate = ''
+    if (typeof spend.offPeak === 'boolean') {
+      rate = ` · ${spend.offPeak ? t('spend.offPeak') : t('spend.peak')}`
+      if (spend.nextSwitchAt !== undefined) {
+        const at = new Date(spend.nextSwitchAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        rate += ` · ${at} ${t('spend.switchAt')}`
+      }
+    }
+    spendTitle = `${money}${rate}`
   }
 
   return (
     <div className={css.root} data-mood={mood}>
       {spend !== undefined && spend.available && (
         <div className={css.spend} role="status" title={spendTitle}>
-          <span className={css.spendIcon} aria-hidden>{spend.offPeak ? '🌙' : '☀️'}</span>
+          {typeof spend.offPeak === 'boolean' && (
+            <span className={css.spendIcon} aria-hidden>{spend.offPeak ? '🌙' : '☀️'}</span>
+          )}
           <span className={css.spendLabel}>{t('spend.today')}</span>
           <span className={css.spendAmount}>{formatMoney(spend.spent, spend.currency)}</span>
         </div>

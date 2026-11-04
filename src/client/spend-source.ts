@@ -24,8 +24,15 @@ export interface SpendView {
   readonly updatedAt: number | null
   /** False while signed out or after a failed query. */
   readonly available: boolean
-  /** True while DeepSeek bills at off-peak (half) rates. */
-  readonly offPeak: boolean
+  /**
+   * True while DeepSeek bills at off-peak (half) rates.
+   *
+   * Optional on purpose: the host half is whatever build the running process
+   * loaded, while this bundle is re-read from disk on every page load, so the
+   * two can legitimately disagree for a while. An absent value means "not
+   * reported", never "off-peak".
+   */
+  readonly offPeak?: boolean
   /** Epoch milliseconds of the next rate switch, when the host reported one. */
   readonly nextSwitchAt?: number
 }
