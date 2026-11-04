@@ -34,6 +34,16 @@ export type {
 /** How often the host re-reads the account balance for the spend readout. */
 const SPEND_POLL_MS = 60_000
 
+/**
+ * Retry gap while the account row may still be mounting.
+ *
+ * A bundle row can mount before the account plugin does, so the first reading
+ * legitimately misses the service. That is a boot race, not a fault: retrying on
+ * this cadence makes the readout appear within seconds instead of a minute, and
+ * it never touches the network because the service is still absent.
+ */
+const SPEND_RETRY_MS = 2_000
+
 /** Client identity the balance query expects; it only shapes the platform request. */
 const ACCOUNT_CLIENT = {
   version: 'dsh-moegirl',
@@ -83,27 +93,42 @@ export function apply(ctx: Context, config: Config = {}): void {
   const pollMs = config.spendPollMs ?? SPEND_POLL_MS
   ctx.effect(() => {
     let stopped = false
-    let lastReason: string | undefined
+    let reported: string | undefined
+    let failures = 0
+    let timer: ReturnType<typeof setTimeout> | undefined
+
     const poll = (): void => {
       if (stopped) return
       const account = ctx.get('deepseekAccount') as AccountBalanceReader | undefined
-      void spend.refresh(() => account === undefined
+      const read = account === undefined
         ? Promise.reject(new Error('deepseekAccount service is not visible from this plugin'))
-        : account.getBalance(ACCOUNT_CLIENT)).then((snapshot) => {
-        // Log on change only: a poll every minute must not flood the terminal.
+        : account.getBalance(ACCOUNT_CLIENT)
+      void spend.refresh(() => read).then((snapshot) => {
+        if (stopped) return
+        // Log on change only, and stay quiet through the mount race: one minute
+        // of retries must not look like a failure in the terminal.
         const reason = snapshot.available ? undefined : snapshot.reason ?? 'unknown'
-        if (reason !== lastReason) {
-          lastReason = reason
-          if (reason === undefined) console.log('[dsh-moegirl] spend readout is live')
-          else console.error('[dsh-moegirl] spend readout unavailable:', reason)
+        if (reason === undefined) {
+          if (reported !== undefined) console.log('[dsh-moegirl] spend readout is live')
+          reported = undefined
+          failures = 0
+        } else {
+          failures += 1
+          const expectedRace = account === undefined && failures <= 5
+          if (!expectedRace && reason !== reported) {
+            reported = reason
+            console.error('[dsh-moegirl] spend readout unavailable:', reason)
+          }
         }
+        // Fast retry only while the row may still be mounting; a signed-out
+        // account or a failed query waits for the normal cadence.
+        timer = setTimeout(poll, account === undefined ? SPEND_RETRY_MS : pollMs)
       })
     }
     poll()
-    const timer = setInterval(poll, pollMs)
-    // One second after mount, and on every minute boundary: the first reading
-    // sets today's baseline, so it has to happen before the first spend.
-    return () => { stopped = true; clearInterval(timer) }
+    // The first reading sets today's baseline, so it has to happen before the
+    // first spend of the day.
+    return () => { stopped = true; if (timer !== undefined) clearTimeout(timer) }
   }, 'dsh-moegirl: spend polling')
 
   ctx.inject(['webServer'], (webCtx) => {
